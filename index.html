@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Audio Boi</title>
+    <style>
+      html {
+        height: 100%;
+      }
+
+      body {
+        height: 100%;
+        background: #ff6f3c;
+        color: #FFFFFF;
+        margin: 0px;
+        padding: 0px;
+        font-family: 'Libre Franklin', sans-serif;
+      }
+
+      #header {
+        width: 100%;
+        padding: 2% 0rem;
+        background: #155263;
+        text-align: center;
+        font-size: 2.5rem;
+        font-style: italic;
+      }
+
+      #album-container {
+        width: 50%;
+        margin: 2% auto;
+        text-align: center;
+        padding: 2%;
+        background: #ff9a3c;
+      }
+
+      #album-art {
+        width: 48%;
+        display: inline-block;
+        vertical-align: middle;
+      }
+
+      #metadata {
+        width: 48%;
+        display: inline-block;
+        vertical-align: middle;
+        font-size: 1rem;
+        line-height: 2rem;
+      }
+
+      #loading-image {
+        width: 48%;
+        display: inline-block;
+        vertical-align: middle;
+      }
+
+      #progress {
+        height: 0.5rem;
+        border: 1px solid #FFFFFF;
+        border-radius: 0.3rem;
+        margin-top: 2rem;
+        cursor: pointer;
+      }
+
+      #progress-bar {
+        height: 0.5rem;
+        background-color: #ffc93c;
+        width: 0;
+      }
+
+      #controls {
+        margin: 0px auto;
+      }
+
+      #controls button {
+        display: inline-block;
+        width: 3rem;
+        height: 2rem;
+        background: rgba(0,0,0,0.5);
+        border: none;
+        border-radius: 0.3rem;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+      }
+
+      .first-color { 
+        background: #155263; 
+      }
+        
+      .second-color { 
+        background: #ff6f3c; 
+      }
+
+      .third-color { 
+        background: #ff9a3c; 
+      }
+
+      .fourth-color { 
+        background: #ffc93c; 
+      }
+
+      @media (max-width: 800px) {
+        #album-art {
+          width: 100%;
+        }
+
+        #metadata {
+          width: 100%;
+          font-size: 1rem;
+          line-height: 2rem;
+          margin-top: 1rem;
+        }
+
+        #progress {
+          margin-top: 1rem;
+        }
+      }
+
+    </style>
+    <link rel="icon" href="./favicon.ico" type="image/x-icon">
+  </head>
+  <body>
+      <div id="header">
+        audio boi
+      </div>
+      <div id="album-container">
+        <img id="album-art" src="images/album_art.jpg" />
+        <img id="loading-image" src="images/loading.gif" />
+        <div id="metadata"></div>
+        <div id="progress">
+          <div id="progress-bar"></div>
+        </div>
+        <br />
+        <div id="controls">
+          <span id="loading">loading</span>
+          <button id="prev_album">⏮</button>
+          <button id="prev">⏴⏴</button>
+          <button id="play">⏵</button>
+          <button id="pause">⏸</button>
+          <button id="next">⏵⏵</button>
+          <button id="next_album">⏭</button>
+        </div>
+        <audio id="audio-container">
+          <source id="audio-source" src="" type="audio/mpeg" />
+          <!-- fallback for non-supporting browsers -->
+          <p>
+              Your browser does not support HTML audio, but you can still
+              <a id="audio-source-fallback" href="">download the music</a>.
+          </p>
+        </audio>
+      </div>
+  </body>
+
+  <script src="js/jsmediatags.js"></script> 
+  <script type="text/javascript">
+    window.onload =  async () => {
+      let jsmediatags = window.jsmediatags;
+
+      const UNKNOWN = 'Unknown';
+      let playing = false;
+
+      const audio = document.getElementById('audio-container');
+      const audio_source = document.getElementById('audio-source');
+      const audio_source_fallback = document.getElementById('audio-source-fallback');
+      const play = document.getElementById('play');
+      const pause = document.getElementById('pause');
+      const prev = document.getElementById('prev');
+      const next = document.getElementById('next');
+      const prev_album = document.getElementById('prev_album');
+      const next_album = document.getElementById('next_album');
+      const loading = document.getElementById('loading');
+      const loading_image = document.getElementById('loading-image');
+      const bar = document.getElementById('progress-bar');
+      const progress = document.getElementById('progress');
+      const metadata = document.getElementById('metadata');
+      const albumArt = document.getElementById('album-art');
+
+      let audio_data = [];
+      let current_album = 0;
+      let current_song = 0;
+      async function loadAudio(){
+        showLoading();
+        const base_audio_url = 'https://glassesaaron.github.io/audio-boi/audio';
+        let album_num = 1;
+        let song_num = 1;
+        let done_loading_albums = false;
+        while(!done_loading_albums){
+          let done_loading_songs = false;
+          let album = [];
+          song_num = 1;
+          while(!done_loading_songs){
+            let audio_path = `${base_audio_url}/album_${album_num}/song_${song_num}.mp3`;
+            const response = await fetch(audio_path);
+            if(response.status === 200){
+              album.push(audio_path);
+              song_num++;
+            } else {
+              done_loading_songs = true;
+            }
+          }
+          if(album.length > 0){
+            audio_data.push(album);
+            album_num++;
+          } else {
+            done_loading_albums = true;
+          }
+        }
+        loadSong(audio_data[0][0]);
+      }
+      await loadAudio();
+
+      function updateAlbumMetadata(artist, album, title, track){
+        metadata.innerHTML = `<b>Artist:</b> ${artist}<br /><b>Album:</b> ${album}<br /><b>Title:</b> ${title}<br /><b>Track:</b> ${track}<br />`;
+      }
+
+      function showLoading(){
+        play.style.display = 'none';
+        pause.style.display = 'none';
+        prev.style.display = 'none';
+        next.style.display = 'none';
+        prev_album.style.display = 'none';
+        next_album.style.display = 'none';
+        metadata.style.display = 'none';
+        loading.style.display = 'block';
+        loading_image.style.display = 'inline-block';
+      }
+
+      function hideLoading(){
+        play.style.display = playing ? 'none' : 'inline-block';
+        pause.style.display = playing ? 'inline-block' : 'none';
+        prev.style.display = 'inline-block';
+        next.style.display = 'inline-block';
+        prev_album.style.display = 'inline-block';
+        next_album.style.display = 'inline-block';
+        metadata.style.display = 'inline-block';
+        loading.style.display = 'none';
+        loading_image.style.display = 'none';
+      }
+
+      function audioLoaded() {
+        const filePath = audio.currentSrc.split('/');
+        const file = filePath[filePath.length-1];
+        const trackNumber = (file.split('.')[0]).split('_')[1];
+        const folder =  filePath[filePath.length-2];
+        const albumNumber = folder.split('_')[1];
+        let track = trackNumber;
+        let album = albumNumber;
+        let artist = UNKNOWN;
+        let title = UNKNOWN;
+        updateAlbumMetadata(artist, album, title, track);
+        jsmediatags.read(audio.currentSrc, {
+          onSuccess: function(tag) {
+            artist = tag?.tags?.artist || UNKNOWN;
+            album = tag?.tags?.album || album;
+            title = tag?.tags?.title || UNKNOWN;
+            track = tag?.tags?.track || track;
+            updateAlbumMetadata(artist, album, title, track);
+            if(tag && tag.tags && tag.tags.picture){
+              var picture = tag.tags.picture;
+              var base64String = '';
+              for (var i = 0; i < picture.data.length; i++) {
+                  base64String += String.fromCharCode(picture.data[i]);
+              }
+              var imageUri = 'data:' + picture.format + ';base64,' + window.btoa(base64String);
+              albumArt.src = imageUri;
+            }
+          },
+          onError: function(error) {
+            console.error(error.type, error.info);
+          }
+        });
+        if(playing){
+          audio.play();
+        }
+        
+        hideLoading();
+      }
+
+      function getPreviousSong(){
+        let next_song = current_song-1;
+        let next_album = current_album;
+        if(next_song < 0){
+          next_album -= 1;
+          if(next_album < 0){
+            next_album=audio_data.length-1;
+          }
+          next_song=audio_data[next_album].length-1;
+        }
+        current_song = next_song;
+        current_album = next_album;
+        return audio_data[current_album][current_song];
+      }
+
+      function getNextSong(){
+        let next_song = current_song+1;
+        let next_album = current_album;
+        if(next_song > audio_data[current_album].length-1){
+          next_song=0;
+          next_album += 1;
+          if(next_album > audio_data.length-1){
+            next_album=0;
+          }
+        }
+        current_song = next_song;
+        current_album = next_album;
+        return audio_data[current_album][current_song];
+      }
+
+      function getPreviousAlbumFirstSong(){
+        let next_album = current_album-1;
+        if(next_album < 0){
+          next_album = audio_data.length-1;
+        }
+        current_song = 0;
+        current_album = next_album;
+        return audio_data[current_album][current_song];
+      }
+
+      function getNextAlbumFirstSong(){
+        let next_album = current_album+1;
+        if(next_album > audio_data.length-1){
+          next_album = 0;
+        }
+        current_song = 0;
+        current_album = next_album;
+        return audio_data[current_album][current_song];
+      }
+
+      play.addEventListener('click', () => {
+        playing = true;
+        audio.play();
+        play.style.display = 'none';
+        pause.style.display = 'inline-block';
+      });
+
+      pause.addEventListener('click', () => {
+        playing = false;
+        audio.pause();
+        pause.style.display = 'none';
+        play.style.display = 'inline-block';
+      });
+
+      function loadSong(song){
+        showLoading();
+        audio_source.src = song;
+        audio.load();
+        audio.addEventListener('canplay', () => {
+          audioLoaded();
+          hideLoading();
+        });
+      }
+
+      prev.addEventListener('click', () => {
+        loadSong(getPreviousSong());
+      });
+
+      next.addEventListener('click', () => {
+        loadSong(getNextSong());
+      });
+
+      prev_album.addEventListener('click', () => {
+        loadSong(getPreviousAlbumFirstSong());
+      });
+
+      next_album.addEventListener('click', () => {
+        loadSong(getNextAlbumFirstSong());
+      });
+
+      audio.addEventListener('timeupdate', () => {
+        bar.style.width = `${Math.floor(
+          (audio.currentTime / audio.duration) * 100
+        )}%`;
+      });
+
+      progress.addEventListener('click', (e) => {
+        const clickPosition = (e.pageX - progress.offsetLeft) / progress.offsetWidth;
+        const clickTime = clickPosition * audio.duration;
+
+        audio.currentTime = clickTime;
+      });
+
+    };
+  </script>
+</html>
